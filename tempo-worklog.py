@@ -69,6 +69,7 @@ def create_tempo_worklog(date_from, date_to, project_key, ftp_host, ftp_dir, ftp
     # print(url)
     print('requesting for tempo worklogs...')
     response = requests.get(url)
+    
     if not response.ok:
         raise RequestException(f'request to get tempo worklogs returned unexpected http code: {response.status_code}')
     if response.ok:
@@ -92,11 +93,13 @@ def get_tempo_data(file, include_labels):  # find elements in tree and deletes .
     tree = ET.parse(file)
     os.remove(file)  # delete .xml file
     root = tree.getroot()
+    
     for worklog in root:
         issue_key = worklog.find('issue_key').text
         print(f'fetching worklog for {issue_key}')
         issue_summary = worklog.find('issue_summary').text
         issue_labels = None
+        
         if include_labels:
             try:
                 issue_labels = get_labels(issue_key)
@@ -104,8 +107,10 @@ def get_tempo_data(file, include_labels):  # find elements in tree and deletes .
                 print(e)
         hours = worklog.find('hours').text
         work_date = worklog.find('work_date').text
+        
         for user_details in worklog.iter('user_details'):
             full_name = user_details.find('full_name').text
+       
         for issue_details in worklog.iter('issue_details'):
             issue_type = issue_details.find('type_name').text
             issue_status = issue_details.find('status_name').text
@@ -113,6 +118,7 @@ def get_tempo_data(file, include_labels):  # find elements in tree and deletes .
             project_name = issue_details.find('project_name').text
         period = datetime.strptime(work_date, '%Y-%m-%d').strftime('%m') + datetime.strptime(work_date, '%Y-%m-%d').strftime('%y')
         month = datetime.strptime(work_date, '%Y-%m-%d').strftime('%B')
+        
         if re.search('.', hours):
             hours = hours.replace('.', ',')
         if re.search(';', issue_summary):
@@ -137,12 +143,14 @@ def save_to_ftp(input_file, ftp_host, ftp_dir, ftp_user, ftp_pass):
     ftp_session = ftplib.FTP(ftp_host)
     ftp_session.login(ftp_user, ftp_pass)
     ftp_session.cwd('/')
+    
     for directory in directories:  # checks if ftp_dest_dir exists, if not mkdir
         if directory in ftp_session.nlst():
             ftp_session.cwd(directory)
         else:
             ftp_session.mkd(directory)
             ftp_session.cwd(directory)
+    
     with open(input_file, 'rb') as output_file:
         ftp_session.storbinary(f'STOR /{ftp_dir}/{input_file}', output_file)
     ftp_session.quit()
@@ -153,10 +161,12 @@ def send_email(input_file, recipient, date_from, date_to):
     message['Subject'] = f'Tempo worklog report from {date_from} to {date_to}'
     message['From'] = SENDER_EMAIL
     message['To'] = recipient
+    
     with open(input_file, 'rb') as file:
         attachment = MIMEApplication(file.read(), filename=os.path.basename(input_file))
     attachment['Content-Disposition'] = 'attachment; filename=%s' % os.path.basename(input_file)
     message.attach(attachment)
+    
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
@@ -167,6 +177,7 @@ def get_labels(issue_key):  # Be careful with large data ranges, it consumes a l
     response = requests.get(
         f'{JIRA_URL}/rest/api/latest/issue/{issue_key}?fields=labels',
         headers={'Authorization': 'Bearer ' + JIRA_TOKEN})
+    
     if response.ok:
         json_data = json.loads(response.text)
         try:
